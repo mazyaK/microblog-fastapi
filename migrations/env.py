@@ -8,7 +8,8 @@ from alembic import context
 
 sys.path = ['', '..'] + sys.path[1:]
 
-from sql_app.database import SQLALCHEMY_DATABASE_URL, Base
+from core.database import SQLALCHEMY_DATABASE_URL
+from core.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

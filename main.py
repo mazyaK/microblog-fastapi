@@ -1,53 +1,53 @@
-from typing import List
+from fastapi import FastAPI
+from starlette.requests import Request
 
-from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy.orm import Session
-
-from sql_app import crud, models, schemas
-from sql_app.database import SessionLocal, engine
-
-models.Base.metadata.create_all(bind=engine)
+from core.database import database
+from routes import routes
+from core.fast_users import fastapi_users
+from user.logic import jwt_authentication, SECRET
+from user.schemas import UserDB
 
 app = FastAPI()
 
 
-# Зависимость
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def on_after_register(user: UserDB, request: Request):
+    print(f"User {user.id} has registered.")
 
 
-@app.post("/users/", response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_username_and_email(db, username=user.username, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username and email already registered")
-    return crud.create_user(db=db, user=user)
+def on_after_forgot_password(user: UserDB, token: str, request: Request):
+    print(f"User {user.id} has forgot their password. Reset token: {token}")
 
 
-@app.get("/users/", response_model=List[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    users = crud.get_users(db, skip=skip, limit=limit)
-    return users
+app.include_router(routes)
+app.include_router(
+    fastapi_users.get_auth_router(jwt_authentication),
+    prefix="/auth/jwt",
+    tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_register_router(on_after_register),
+    prefix="/auth",
+    tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_reset_password_router(
+        SECRET, after_forgot_password=on_after_forgot_password
+    ),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(),
+    prefix="/users",
+    tags=["users"]
+)
 
 
-@app.get("/users/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = crud.get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+@app.on_event("startup")
+async def startup():
+    await database.connect()
 
 
-@app.post("/users/{user_id}/items/", response_model=schemas.Item)
-def create_item_for_user(user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)):
-    return crud.create_user_item(db=db, item=item, user_id=user_id)
-
-
-@app.get("/items/", response_model=List[schemas.Item])
-def read_itens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    items = crud.get_items(db, skip=skip, limit=limit)
-    return items
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
