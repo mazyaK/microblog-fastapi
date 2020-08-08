@@ -14,18 +14,6 @@ class User(models.BaseUser):
         orm_mode = True
 
 
-# class UserInPost(BaseModel):
-#     id: Optional[str]
-#     name: str = None
-#
-#     @pydantic.validator("id", pre=True, always=True)
-#     def default_id(cls, v):
-#         return v or str(uuid.uuid4())
-#
-#     class Config:
-#         orm_mode = True
-
-
 class UserCreate(User, models.BaseUserCreate):
     name: str
     date: datetime.date
@@ -43,3 +31,15 @@ class UserUpdate(User, models.BaseUserUpdate):
 
 class UserDB(User, models.BaseUserDB):
     pass
+
+
+class UserInPost(BaseModel):
+    id: Optional[str]
+    name: str = None
+
+    @pydantic.validator("id", pre=True, always=True)
+    def default_id(cls, v):
+        return v or str(uuid.uuid4())
+
+    class Config:
+        orm_mode = True
